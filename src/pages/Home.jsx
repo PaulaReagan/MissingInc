@@ -19,16 +19,31 @@ export default function Home() {
 
   const displayName =
     userProfile?.username || currentUser?.displayName || currentUser?.email;
+  const profilePicture = userProfile?.profilePicture;
 
   return (
     <div className="home-container">
       <header className="home-header">
         <div className="home-logo">MyApp</div>
         <div className="home-user-section">
-          <div className="home-avatar">
-            {displayName?.charAt(0)?.toUpperCase() || "U"}
+          <div
+            className="home-avatar"
+            onClick={() => navigate("/profile")}
+            style={{ cursor: "pointer" }}
+          >
+            {profilePicture ? (
+              <img src={profilePicture} alt="" className="home-avatar-img" />
+            ) : (
+              displayName?.charAt(0)?.toUpperCase() || "U"
+            )}
           </div>
-          <span className="home-username">{displayName}</span>
+          <span
+            className="home-username"
+            onClick={() => navigate("/profile")}
+            style={{ cursor: "pointer" }}
+          >
+            {displayName}
+          </span>
           <button
             onClick={handleLogout}
             className="btn btn-logout"

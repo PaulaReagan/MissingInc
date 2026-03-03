@@ -6,8 +6,9 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, googleProvider, db } from "../firebase/config";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, googleProvider, db, storage } from "../firebase/config";
 
 const AuthContext = createContext();
 
@@ -51,6 +52,30 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
+  async function updateUsername(newUsername) {
+    if (!currentUser) throw new Error("Not authenticated");
+    if (!newUsername || newUsername.trim().length < 3) {
+      throw new Error("Username must be at least 3 characters.");
+    }
+    const trimmed = newUsername.trim();
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      username: trimmed,
+    });
+    setUserProfile((prev) => ({ ...prev, username: trimmed }));
+  }
+
+  async function uploadProfilePicture(file) {
+    if (!currentUser) throw new Error("Not authenticated");
+    const storageRef = ref(storage, `profilePictures/${currentUser.uid}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      profilePicture: downloadURL,
+    });
+    setUserProfile((prev) => ({ ...prev, profilePicture: downloadURL }));
+    return downloadURL;
+  }
+
   async function fetchUserProfile(user) {
     if (user) {
       const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -80,6 +105,8 @@ export function AuthProvider({ children }) {
     login,
     loginWithGoogle,
     logout,
+    updateUsername,
+    uploadProfilePicture,
   };
 
   return (
