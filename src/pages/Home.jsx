@@ -1,10 +1,53 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+
+const MOCK_STORIES = [
+  {
+    id: "1",
+    name: "Person 1",
+    age: "-",
+    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
+    lastSeen: "-",
+    lastSeenDate: "-",
+    height: "-",
+    weight: "-",
+    hair: "-",
+    eyes: "-",
+    summary: "-",
+  },
+  {
+    id: "2",
+    name: "Person 2",
+    age: "-",
+    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    lastSeen: "-",
+    lastSeenDate: "-",
+    height: "-",
+    weight: "-",
+    hair: "-",
+    eyes: "-",
+    summary: "-",
+  },
+  {
+    id: "3",
+    name: "Person 3",
+    age: "-",
+    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop&crop=face",
+    lastSeen: "-",
+    lastSeenDate: "-",
+    height: "-",
+    weight: "-",
+    hair: "-",
+    eyes: "-",
+    summary: "-",
+  },
+];
 
 export default function Home() {
   const { currentUser, userProfile, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const sliderRef = useRef(null);
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -15,6 +58,18 @@ export default function Home() {
     } catch {
       setLoggingOut(false);
     }
+  }
+
+  function scrollSlider(direction) {
+    if (!sliderRef.current) return;
+    const cardWidth =
+      sliderRef.current.querySelector(".slider-card")?.offsetWidth || 260;
+    const gap = 20;
+    const scrollAmount = (cardWidth + gap) * 2;
+    sliderRef.current.scrollBy({
+      left: direction === "right" ? scrollAmount : -scrollAmount,
+      behavior: "smooth",
+    });
   }
 
   const displayName =
@@ -55,9 +110,54 @@ export default function Home() {
       </header>
 
       <main className="home-main">
-        <h1 className="home-title">Welcome to your homepage</h1>
-        <p className="home-subtitle">You're signed in as <strong>{displayName}</strong></p>
+        <h1 className="home-title">Featured Stories</h1>
+        <p className="home-subtitle">Help bring the missing home</p>
+
+        <div className="slider-wrapper">
+          <button
+            className="slider-arrow slider-arrow-left"
+            onClick={() => scrollSlider("left")}
+            aria-label="Scroll left"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <div className="slider-track" ref={sliderRef}>
+            {MOCK_STORIES.map((story) => (
+              <div
+                className="slider-card"
+                key={story.id}
+                onClick={() => navigate(`/story/${story.id}`)}
+              >
+                <div className="slider-card-image">
+                  <img src={story.image} alt={story.name} />
+                </div>
+                <div className="slider-card-info">
+                  <span className="slider-card-name">{story.name}</span>
+                  <span className="slider-card-age">Age {story.age}</span>
+                  <span className="slider-card-location">
+                    Last seen: {story.lastSeen}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            className="slider-arrow slider-arrow-right"
+            onClick={() => scrollSlider("right")}
+            aria-label="Scroll right"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
       </main>
     </div>
   );
 }
+
+export { MOCK_STORIES };
