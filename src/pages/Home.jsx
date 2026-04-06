@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -99,6 +100,11 @@ export default function Home() {
           >
             {displayName}
           </span>
+
+          <Link to="/map">
+            <button className="btn">Map</button>
+          </Link>
+
           <button
             onClick={handleLogout}
             className="btn btn-logout"
