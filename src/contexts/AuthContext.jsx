@@ -92,7 +92,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      await fetchUserProfile(user);
+      try {
+        await fetchUserProfile(user);
+      } catch (err) {
+        console.error("Failed to fetch user profile:", err);
+      }
       setLoading(false);
     });
     return unsubscribe;

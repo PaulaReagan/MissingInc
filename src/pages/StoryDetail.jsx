@@ -1,0 +1,266 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  collection,
+  addDoc,
+  doc,
+  deleteDoc,
+  query,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
+import { useAuth } from "../contexts/AuthContext";
+import { MOCK_STORIES } from "./Home";
+
+export default function StoryDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { currentUser, userProfile } = useAuth();
+  const story = MOCK_STORIES.find((s) => s.id === id);
+
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    const q = query(
+      collection(db, "stories", id, "comments"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setComments(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
+      },
+      (err) => console.error("Failed to load comments:", err)
+    );
+    return unsubscribe;
+  }, [id]);
+
+  async function handlePostComment(e) {
+    e.preventDefault();
+    if (!newComment.trim() || posting) return;
+    setPosting(true);
+    try {
+      const commentData = {
+        text: newComment.trim(),
+        authorId: currentUser.uid,
+        authorName:
+          userProfile?.username ||
+          currentUser.displayName ||
+          currentUser.email,
+        authorPicture: userProfile?.profilePicture || null,
+        createdAt: new Date().toISOString(),
+        storyId: id,
+        storyName: story?.name || "Unknown",
+      };
+
+      const storyCommentRef = await addDoc(
+        collection(db, "stories", id, "comments"),
+        commentData
+      );
+
+      await addDoc(
+        collection(db, "users", currentUser.uid, "commentHistory"),
+        {
+          ...commentData,
+          storyCommentId: storyCommentRef.id,
+        }
+      );
+
+      setNewComment("");
+    } catch (err) {
+      console.error("Failed to post comment:", err);
+    }
+    setPosting(false);
+  }
+
+  async function handleDeleteComment(comment) {
+    if (!confirm("Delete this comment?")) return;
+    try {
+      await deleteDoc(doc(db, "stories", id, "comments", comment.id));
+
+      const historyQuery = query(
+        collection(db, "users", comment.authorId, "commentHistory"),
+        orderBy("createdAt", "desc")
+      );
+      const unsubOnce = onSnapshot(historyQuery, (snapshot) => {
+        const match = snapshot.docs.find(
+          (d) => d.data().storyCommentId === comment.id
+        );
+        if (match) {
+          deleteDoc(
+            doc(db, "users", comment.authorId, "commentHistory", match.id)
+          );
+        }
+        unsubOnce();
+      });
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+    }
+  }
+
+  function timeAgo(dateString) {
+    const seconds = Math.floor(
+      (Date.now() - new Date(dateString).getTime()) / 1000
+    );
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  if (!story) {
+    return (
+      <div className="story-not-found">
+        <h1>Story not found</h1>
+        <button className="btn btn-primary" onClick={() => navigate("/")}>
+          Back to Home
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="story-detail">
+      <button className="story-back" onClick={() => navigate("/")}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        Back to Stories
+      </button>
+
+      <div className="story-content">
+        <div className="story-image-col">
+          <img src={story.image} alt={story.name} className="story-hero-image" />
+        </div>
+
+        <div className="story-info-col">
+          <h1 className="story-name">{story.name}</h1>
+          <span className="story-status-badge">Missing</span>
+
+          <div className="story-details-grid">
+            <div className="story-detail-item">
+              <span className="story-detail-label">Age</span>
+              <span className="story-detail-value">{story.age}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Last Seen</span>
+              <span className="story-detail-value">{story.lastSeen}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Date</span>
+              <span className="story-detail-value">{story.lastSeenDate}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Height</span>
+              <span className="story-detail-value">{story.height}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Weight</span>
+              <span className="story-detail-value">{story.weight}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Hair</span>
+              <span className="story-detail-value">{story.hair}</span>
+            </div>
+            <div className="story-detail-item">
+              <span className="story-detail-label">Eyes</span>
+              <span className="story-detail-value">{story.eyes}</span>
+            </div>
+          </div>
+
+          <div className="story-summary">
+            <h2 className="story-summary-heading">Story</h2>
+            <p className="story-summary-text">{story.summary}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="thread-section">
+        <h2 className="thread-heading">
+          Community Discussion
+          <span className="thread-count">{comments.length}</span>
+        </h2>
+
+        <form className="thread-compose" onSubmit={handlePostComment}>
+          <div className="thread-compose-avatar">
+            {userProfile?.profilePicture ? (
+              <img src={userProfile.profilePicture} alt="" />
+            ) : (
+              (userProfile?.username || currentUser?.email || "U")
+                .charAt(0)
+                .toUpperCase()
+            )}
+          </div>
+          <div className="thread-compose-input-wrapper">
+            <textarea
+              className="thread-compose-input"
+              placeholder="Share your thoughts, tips, or information..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              rows={3}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary thread-compose-btn"
+              disabled={posting || !newComment.trim()}
+            >
+              {posting ? "Posting..." : "Post"}
+            </button>
+          </div>
+        </form>
+
+        <div className="thread-comments">
+          {comments.length === 0 && (
+            <div className="thread-empty">
+              No comments yet. Be the first to share your thoughts.
+            </div>
+          )}
+
+          {comments.map((comment) => (
+            <div className="thread-comment" key={comment.id}>
+              <div className="thread-comment-avatar">
+                {comment.authorPicture ? (
+                  <img src={comment.authorPicture} alt="" />
+                ) : (
+                  (comment.authorName || "U").charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="thread-comment-body">
+                <div className="thread-comment-header">
+                  <span className="thread-comment-author">
+                    {comment.authorName}
+                  </span>
+                  <span className="thread-comment-time">
+                    {timeAgo(comment.createdAt)}
+                  </span>
+                  {comment.authorId === currentUser?.uid && (
+                    <button
+                      className="thread-comment-delete"
+                      onClick={() => handleDeleteComment(comment)}
+                      title="Delete comment"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <p className="thread-comment-text">{comment.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

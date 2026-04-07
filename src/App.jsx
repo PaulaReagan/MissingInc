@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
+import StoryDetail from "./pages/StoryDetail";
 
 function App() {
   return (
@@ -18,6 +19,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/story/:id"
+            element={
+              <ProtectedRoute>
+                <StoryDetail />
               </ProtectedRoute>
             }
           />
