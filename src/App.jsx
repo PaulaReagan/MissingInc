@@ -13,6 +13,7 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          <Route path = "/map" element={<Map />} />
           <Route
             path="/"
             element={
