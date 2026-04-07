@@ -1,5 +1,14 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  collection,
+  doc,
+  deleteDoc,
+  query,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 
 function getInitials(name) {
@@ -20,8 +29,54 @@ export default function Profile() {
   const [newUsername, setNewUsername] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
+  const [commentHistory, setCommentHistory] = useState([]);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, "users", currentUser.uid, "commentHistory"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setCommentHistory(
+          snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
+        );
+      },
+      (err) => console.error("Failed to load comment history:", err)
+    );
+    return unsubscribe;
+  }, [currentUser]);
+
+  async function handleDeleteHistoryComment(item) {
+    if (!confirm("Delete this comment? It will also be removed from the story thread.")) return;
+    try {
+      await deleteDoc(
+        doc(db, "stories", item.storyId, "comments", item.storyCommentId)
+      );
+      await deleteDoc(
+        doc(db, "users", currentUser.uid, "commentHistory", item.id)
+      );
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+    }
+  }
+
+  function timeAgo(dateString) {
+    const seconds = Math.floor(
+      (Date.now() - new Date(dateString).getTime()) / 1000
+    );
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
 
   const displayName =
     userProfile?.username || currentUser?.displayName || currentUser?.email;
@@ -134,6 +189,9 @@ export default function Profile() {
       </header>
 
       <main className="profile-main">
+        <div className="profile-welcome">
+          <h1>Hey Detective, {displayName}</h1>
+        </div>
         <div className="profile-grid">
           {/* Left column — profile picture */}
           <div className="profile-col profile-col-picture">
@@ -211,12 +269,47 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Middle column — Past Posts */}
+          {/* Middle column — Comment History */}
           <div className="profile-col profile-col-middle">
-            <h3 className="profile-col-heading">Past Posts</h3>
-            <div className="profile-posts-empty">
-              <p>No posts yet</p>
-            </div>
+            <h3 className="profile-col-heading">
+              Comment History
+              <span className="profile-comment-count">{commentHistory.length}</span>
+            </h3>
+
+            {commentHistory.length === 0 ? (
+              <div className="profile-posts-empty">
+                <p>No comments yet</p>
+              </div>
+            ) : (
+              <div className="profile-comment-list">
+                {commentHistory.map((item) => (
+                  <div className="profile-comment-item" key={item.id}>
+                    <div className="profile-comment-item-header">
+                      <span
+                        className="profile-comment-story-link"
+                        onClick={() => navigate(`/story/${item.storyId}`)}
+                      >
+                        {item.storyName}
+                      </span>
+                      <span className="profile-comment-item-time">
+                        {timeAgo(item.createdAt)}
+                      </span>
+                      <button
+                        className="thread-comment-delete"
+                        onClick={() => handleDeleteHistoryComment(item)}
+                        title="Delete comment"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="profile-comment-item-text">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right column — Followers & Following */}
