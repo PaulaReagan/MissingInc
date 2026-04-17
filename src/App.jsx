@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import MapPage from './pages/MapPage';
+import MapPage from "./pages/MapPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
@@ -13,7 +13,6 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path = "/map" element={<MapPage />} />
           <Route
             path="/"
             element={
