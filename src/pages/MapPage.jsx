@@ -1,6 +1,6 @@
 import { useState } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet"; 
 import { useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 
