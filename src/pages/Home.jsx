@@ -80,7 +80,7 @@ export default function Home() {
   return (
     <div className="home-container">
       <header className="home-header">
-        <div className="home-logo">MyApp</div>
+        <div className="home-logo">Missing: Sonoma County</div>
         <div className="home-user-section">
           <div
             className="home-avatar"
