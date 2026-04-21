@@ -41,9 +41,9 @@ const MOCK_CASES = [
     id: "3",
     name: "Person 3",
     age: 14,
-    lat: 38.2324,
+    lat: 38.3396,
     lng: -122.6367,
-    lastSeen: "Petaluma, CA",
+    lastSeen: "Rohnert Park, CA",
     lastSeenDate: "2026-04-08",
   },
 ];
