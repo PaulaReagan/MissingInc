@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet"; 
 import { useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
+import { subscribeToStories } from "../data/stories";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -60,6 +61,16 @@ function LocationMarker({ setMarkerPosition }) {
 export default function MapPage() {
   const navigate = useNavigate();
   const [markerPosition, setMarkerPosition] = useState(null);
+  const [firestoreStories, setFirestoreStories] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToStories(setFirestoreStories);
+    return unsubscribe;
+  }, []);
+
+  const firestoreWithCoords = firestoreStories.filter(
+    (s) => typeof s.lat === "number" && typeof s.lng === "number"
+  );
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
@@ -100,6 +111,38 @@ export default function MapPage() {
                 Last seen: {person.lastSeen}
                 <br />
                 Date: {person.lastSeenDate}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {firestoreWithCoords.map((person) => (
+          <Marker key={person.id} position={[person.lat, person.lng]}>
+            <Popup>
+              <div>
+                <strong>{person.name}</strong>
+                <br />
+                Age: {person.age}
+                <br />
+                Last seen: {person.lastSeen}
+                <br />
+                Date: {person.lastSeenDate}
+                <br />
+                <button
+                  type="button"
+                  onClick={() => navigate(`/story/${person.id}`)}
+                  style={{
+                    marginTop: 6,
+                    background: "transparent",
+                    border: "none",
+                    color: "#4f46e5",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  View details →
+                </button>
               </div>
             </Popup>
           </Marker>

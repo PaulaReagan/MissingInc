@@ -18,6 +18,10 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 import { MOCK_STORIES } from "./Home";
+import { getStoryById } from "../data/stories";
+
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
 
 // Fix default marker icons when bundled with Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -31,11 +35,41 @@ export default function StoryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser, userProfile } = useAuth();
-  const story = MOCK_STORIES.find((s) => s.id === id);
+
+  const mockStory = MOCK_STORIES.find((s) => s.id === id);
+  const [story, setStory] = useState(mockStory || null);
+  const [loadingStory, setLoadingStory] = useState(!mockStory);
 
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
+
+  useEffect(() => {
+    if (mockStory) {
+      setStory(mockStory);
+      setLoadingStory(false);
+      return;
+    }
+    let active = true;
+    setLoadingStory(true);
+    getStoryById(id)
+      .then((fetched) => {
+        if (active) {
+          setStory(fetched);
+          setLoadingStory(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load story:", err);
+        if (active) {
+          setStory(null);
+          setLoadingStory(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, mockStory]);
 
   useEffect(() => {
     if (!id) return;
@@ -131,6 +165,14 @@ export default function StoryDetail() {
     return `${days}d ago`;
   }
 
+  if (loadingStory) {
+    return (
+      <div className="story-not-found">
+        <h1>Loading…</h1>
+      </div>
+    );
+  }
+
   if (!story) {
     return (
       <div className="story-not-found">
@@ -153,7 +195,14 @@ export default function StoryDetail() {
 
       <div className="story-content">
         <div className="story-image-col">
-          <img src={story.image} alt={story.name} className="story-hero-image" />
+          <img
+            src={story.image || PLACEHOLDER_IMAGE}
+            alt={story.name}
+            className="story-hero-image"
+            onError={(e) => {
+              e.currentTarget.src = PLACEHOLDER_IMAGE;
+            }}
+          />
 
           {typeof story.lat === "number" && typeof story.lng === "number" && (
             <div className="story-map-card">

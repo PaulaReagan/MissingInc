@@ -1,7 +1,12 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { subscribeToStories } from "../data/stories";
+import CreateCaseModal from "../components/CreateCaseModal";
+
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
 
 const MOCK_STORIES = [
   {
@@ -54,8 +59,17 @@ const MOCK_STORIES = [
 export default function Home() {
   const { currentUser, userProfile, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [firestoreStories, setFirestoreStories] = useState([]);
   const sliderRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToStories(setFirestoreStories);
+    return unsubscribe;
+  }, []);
+
+  const allStories = [...firestoreStories, ...MOCK_STORIES];
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -125,6 +139,28 @@ export default function Home() {
         <h1 className="home-title">Featured Stories</h1>
         <p className="home-subtitle">Help bring the missing home</p>
 
+        <div className="home-cta-row">
+          <button
+            className="btn btn-primary home-create-btn"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Create New Case
+          </button>
+        </div>
+
         <div className="slider-wrapper">
           <button
             className="slider-arrow slider-arrow-left"
@@ -137,14 +173,20 @@ export default function Home() {
           </button>
 
           <div className="slider-track" ref={sliderRef}>
-            {MOCK_STORIES.map((story) => (
+            {allStories.map((story) => (
               <div
                 className="slider-card"
                 key={story.id}
                 onClick={() => navigate(`/story/${story.id}`)}
               >
                 <div className="slider-card-image">
-                  <img src={story.image} alt={story.name} />
+                  <img
+                    src={story.image || PLACEHOLDER_IMAGE}
+                    alt={story.name}
+                    onError={(e) => {
+                      e.currentTarget.src = PLACEHOLDER_IMAGE;
+                    }}
+                  />
                 </div>
                 <div className="slider-card-info">
                   <span className="slider-card-name">{story.name}</span>
@@ -168,6 +210,10 @@ export default function Home() {
           </button>
         </div>
       </main>
+
+      {showCreateModal && (
+        <CreateCaseModal onClose={() => setShowCreateModal(false)} />
+      )}
     </div>
   );
 }
