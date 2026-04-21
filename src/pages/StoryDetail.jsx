@@ -9,9 +9,23 @@ import {
   orderBy,
   onSnapshot,
 } from "firebase/firestore";
+import L from "leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 import { MOCK_STORIES } from "./Home";
+
+// Fix default marker icons when bundled with Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 export default function StoryDetail() {
   const { id } = useParams();
@@ -140,6 +154,44 @@ export default function StoryDetail() {
       <div className="story-content">
         <div className="story-image-col">
           <img src={story.image} alt={story.name} className="story-hero-image" />
+
+          {typeof story.lat === "number" && typeof story.lng === "number" && (
+            <div className="story-map-card">
+              <div className="story-map-header">
+                <span className="story-map-label">Last Seen</span>
+                <span className="story-map-location">{story.lastSeen}</span>
+              </div>
+              <div className="story-map-wrapper">
+                <MapContainer
+                  center={[story.lat, story.lng]}
+                  zoom={12}
+                  scrollWheelZoom={false}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    attribution="&copy; OpenStreetMap contributors"
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[story.lat, story.lng]}>
+                    <Popup>
+                      <strong>{story.name}</strong>
+                      <br />
+                      Last seen: {story.lastSeen}
+                      <br />
+                      Date: {story.lastSeenDate}
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <button
+                type="button"
+                className="story-map-open"
+                onClick={() => navigate("/map")}
+              >
+                Open full map →
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="story-info-col">
