@@ -9,12 +9,67 @@ import {
   query,
   serverTimestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
 import { db, storage } from "../firebase/config";
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // 8 MB
+const COMPRESSION_SKIP_BELOW_BYTES = 500 * 1024; // don't bother for tiny files
+const MAX_IMAGE_DIMENSION = 1600; // px — plenty for a case photo
+const JPEG_QUALITY = 0.85;
 
-export async function uploadStoryPhoto(file, user) {
+async function compressImageIfNeeded(file) {
+  if (file.size <= COMPRESSION_SKIP_BELOW_BYTES) return file;
+  // GIFs/animated images: skip compression (canvas would kill animation)
+  if (file.type === "image/gif") return file;
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { width, height } = img;
+      const longest = Math.max(width, height);
+      const scale = longest > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / longest : 1;
+      const newWidth = Math.round(width * scale);
+      const newHeight = Math.round(height * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const resized = new File(
+            [blob],
+            (file.name || "photo").replace(/\.[^.]+$/, "") + ".jpg",
+            { type: "image/jpeg" }
+          );
+          // Only swap to the resized version if it's actually smaller
+          resolve(resized.size < file.size ? resized : file);
+        },
+        "image/jpeg",
+        JPEG_QUALITY
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+}
+
+export async function uploadStoryPhoto(file, user, onProgress) {
   if (!user) throw new Error("You must be logged in to upload a photo.");
   if (!file) throw new Error("No file provided.");
   if (!file.type || !file.type.startsWith("image/")) {
@@ -24,11 +79,35 @@ export async function uploadStoryPhoto(file, user) {
     throw new Error("Image is too large (max 8 MB).");
   }
 
-  const safeName = (file.name || "photo").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const prepared = await compressImageIfNeeded(file);
+
+  const safeName = (prepared.name || "photo").replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `storyPhotos/${user.uid}/${Date.now()}-${safeName}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file, { contentType: file.type });
-  return await getDownloadURL(storageRef);
+  const task = uploadBytesResumable(storageRef, prepared, {
+    contentType: prepared.type,
+  });
+
+  return new Promise((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snapshot) => {
+        if (onProgress && snapshot.totalBytes > 0) {
+          const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress(pct);
+        }
+      },
+      (err) => reject(err),
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve(url);
+        } catch (err) {
+          reject(err);
+        }
+      }
+    );
+  });
 }
 
 const STORIES_COLLECTION = "stories";

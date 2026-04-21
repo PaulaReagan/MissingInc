@@ -51,6 +51,7 @@ export default function CreateCaseModal({ onClose }) {
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState("");
 
   const fileInputRef = useRef(null);
@@ -107,14 +108,19 @@ export default function CreateCaseModal({ onClose }) {
     }
 
     setSubmitting(true);
+    setUploadPct(0);
     try {
       let imageUrl = "";
       if (photoFile) {
-        setUploadProgress("Uploading photo…");
-        imageUrl = await uploadStoryPhoto(photoFile, currentUser);
+        setUploadProgress("Preparing photo…");
+        imageUrl = await uploadStoryPhoto(photoFile, currentUser, (pct) => {
+          setUploadProgress("Uploading photo…");
+          setUploadPct(pct);
+        });
       }
 
       setUploadProgress("Saving case…");
+      setUploadPct(100);
       await createStory(
         {
           name,
@@ -141,6 +147,7 @@ export default function CreateCaseModal({ onClose }) {
     } finally {
       setSubmitting(false);
       setUploadProgress("");
+      setUploadPct(0);
     }
   }
 
@@ -415,6 +422,21 @@ export default function CreateCaseModal({ onClose }) {
             </div>
           </div>
 
+          {submitting && uploadPct > 0 && uploadPct < 100 && (
+            <div
+              className="modal-upload-bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(uploadPct)}
+            >
+              <div
+                className="modal-upload-bar-fill"
+                style={{ width: `${uploadPct}%` }}
+              />
+            </div>
+          )}
+
           <div className="modal-actions">
             <button
               type="button"
@@ -430,7 +452,9 @@ export default function CreateCaseModal({ onClose }) {
               disabled={submitting}
             >
               {submitting
-                ? uploadProgress || "Submitting…"
+                ? uploadPct > 0 && uploadPct < 100
+                  ? `Uploading… ${Math.round(uploadPct)}%`
+                  : uploadProgress || "Submitting…"
                 : "Submit Case"}
             </button>
           </div>
