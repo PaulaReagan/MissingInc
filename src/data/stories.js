@@ -8,7 +8,27 @@ import {
   query,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "../firebase/config";
+
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // 8 MB
+
+export async function uploadStoryPhoto(file, user) {
+  if (!user) throw new Error("You must be logged in to upload a photo.");
+  if (!file) throw new Error("No file provided.");
+  if (!file.type || !file.type.startsWith("image/")) {
+    throw new Error("Please choose an image file.");
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    throw new Error("Image is too large (max 8 MB).");
+  }
+
+  const safeName = (file.name || "photo").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `storyPhotos/${user.uid}/${Date.now()}-${safeName}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file, { contentType: file.type });
+  return await getDownloadURL(storageRef);
+}
 
 const STORIES_COLLECTION = "stories";
 

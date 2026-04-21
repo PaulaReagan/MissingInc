@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -11,7 +11,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useAuth } from "../contexts/AuthContext";
-import { createStory } from "../data/stories";
+import { createStory, uploadStoryPhoto } from "../data/stories";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -37,7 +37,8 @@ export default function CreateCaseModal({ onClose }) {
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
-  const [image, setImage] = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
   const [lastSeen, setLastSeen] = useState("");
   const [lastSeenDate, setLastSeenDate] = useState("");
   const [height, setHeight] = useState("");
@@ -47,8 +48,36 @@ export default function CreateCaseModal({ onClose }) {
   const [summary, setSummary] = useState("");
   const [position, setPosition] = useState(null);
 
+  const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [error, setError] = useState("");
+
+  const fileInputRef = useRef(null);
+  const dragCounter = useRef(0);
+
+  function handleFileSelected(file) {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith("image/")) {
+      setError("Please drop an image file (jpg, png, webp, etc.).");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image is too large (max 8 MB).");
+      return;
+    }
+    setError("");
+    setPhotoFile(file);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  function clearPhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   useEffect(() => {
     function onKey(e) {
@@ -62,6 +91,12 @@ export default function CreateCaseModal({ onClose }) {
     };
   }, [onClose]);
 
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -73,11 +108,18 @@ export default function CreateCaseModal({ onClose }) {
 
     setSubmitting(true);
     try {
+      let imageUrl = "";
+      if (photoFile) {
+        setUploadProgress("Uploading photo…");
+        imageUrl = await uploadStoryPhoto(photoFile, currentUser);
+      }
+
+      setUploadProgress("Saving case…");
       await createStory(
         {
           name,
           age,
-          image,
+          image: imageUrl,
           lastSeen,
           lastSeenDate,
           height,
@@ -98,7 +140,38 @@ export default function CreateCaseModal({ onClose }) {
       setError(err.message || "Failed to create case. Please try again.");
     } finally {
       setSubmitting(false);
+      setUploadProgress("");
     }
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current += 1;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setIsDragging(true);
+    }
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setIsDragging(false);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleFileSelected(file);
   }
 
   return (
@@ -108,7 +181,23 @@ export default function CreateCaseModal({ onClose }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-card" role="dialog" aria-modal="true">
+      <div
+        className={`modal-card${isDragging ? " modal-card-dragging" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="modal-drop-overlay" aria-hidden="true">
+            <div className="modal-drop-overlay-text">
+              Drop photo to upload
+            </div>
+          </div>
+        )}
+
         <div className="modal-header">
           <h2 className="modal-title">Create New Case</h2>
           <button
@@ -150,14 +239,62 @@ export default function CreateCaseModal({ onClose }) {
             </div>
 
             <div className="form-group modal-grid-full">
-              <label htmlFor="case-image">Photo URL</label>
+              <label>Photo</label>
               <input
-                id="case-image"
-                type="url"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                placeholder="https://… (leave blank for placeholder)"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => handleFileSelected(e.target.files?.[0])}
               />
+              {photoPreview ? (
+                <div className="photo-preview">
+                  <img src={photoPreview} alt="Selected" />
+                  <div className="photo-preview-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={clearPhoto}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="photo-dropzone"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span className="photo-dropzone-primary">
+                    Drag &amp; drop a photo here
+                  </span>
+                  <span className="photo-dropzone-secondary">
+                    or click to browse — max 8 MB. Leave blank for a placeholder.
+                  </span>
+                </button>
+              )}
             </div>
 
             <div className="form-group">
@@ -292,7 +429,9 @@ export default function CreateCaseModal({ onClose }) {
               className="btn btn-primary"
               disabled={submitting}
             >
-              {submitting ? "Submitting…" : "Submit Case"}
+              {submitting
+                ? uploadProgress || "Submitting…"
+                : "Submit Case"}
             </button>
           </div>
         </form>
