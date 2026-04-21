@@ -17,6 +17,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+// just for examples
 const MOCK_CASES = [
   {
     id: "1",
@@ -33,7 +34,7 @@ const MOCK_CASES = [
     age: 22,
     lat: 38.2919,
     lng: -122.4580,
-    lastSeen: "Petaluma, CA",
+    lastSeen: "Sonoma, CA",
     lastSeenDate: "2026-04-12",
   },
   {
@@ -42,7 +43,7 @@ const MOCK_CASES = [
     age: 14,
     lat: 38.2324,
     lng: -122.6367,
-    lastSeen: "Rohnert Park, CA",
+    lastSeen: "Petaluma, CA",
     lastSeenDate: "2026-04-08",
   },
 ];
@@ -157,3 +158,5 @@ export default function MapPage() {
     </div>
   );
 }
+
+//leaflet stuff from web

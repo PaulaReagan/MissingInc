@@ -228,4 +228,4 @@ export default function Home() {
   );
 }
 
-export { MOCK_STORIES };
+export { MOCK_STORIES }; // add fake data for demo
