@@ -6,7 +6,7 @@ A web application built with React and Firebase featuring user authentication (e
 
 You need **Node.js** installed on your machine before running this project.
 
-- Download and install from: https://nodejs.org (grab the **LTS** version)
+- Download and install from: https://nodejs.org 
 - To verify it installed correctly, open a terminal and run:
 
 ```bash
