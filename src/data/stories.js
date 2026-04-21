@@ -3,6 +3,7 @@ import {
   addDoc,
   doc,
   getDoc,
+  deleteDoc,
   onSnapshot,
   orderBy,
   query,
@@ -83,4 +84,9 @@ export async function getStoryById(id) {
   const snapshot = await getDoc(doc(db, STORIES_COLLECTION, id));
   if (!snapshot.exists()) return null;
   return { id: snapshot.id, ...snapshot.data() };
+}
+
+export async function deleteStory(storyId, user) {
+  if (!user) throw new Error("You must be logged in.");
+  await deleteDoc(doc(db, STORIES_COLLECTION, storyId));
 }

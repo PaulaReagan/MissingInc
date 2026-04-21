@@ -179,6 +179,16 @@ export default function Home() {
                 key={story.id}
                 onClick={() => navigate(`/story/${story.id}`)}
               >
+                <div
+                  className={
+                    "slider-card-credit" +
+                    (story.createdBy ? " slider-card-credit-user" : "")
+                  }
+                >
+                  {story.createdBy
+                    ? `Case Created By: ${story.createdByName || "Anonymous"}`
+                    : "Featured Story"}
+                </div>
                 <div className="slider-card-image">
                   <img
                     src={story.image || PLACEHOLDER_IMAGE}

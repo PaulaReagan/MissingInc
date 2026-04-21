@@ -18,7 +18,7 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 import { MOCK_STORIES } from "./Home";
-import { getStoryById } from "../data/stories";
+import { getStoryById, deleteStory } from "../data/stories";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
@@ -43,6 +43,26 @@ export default function StoryDetail() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const isOwner =
+    story && story.createdBy && currentUser && story.createdBy === currentUser.uid;
+
+  async function handleDeleteStory() {
+    if (!story || !isOwner) return;
+    if (!confirm(`Delete this case for ${story.name}? This cannot be undone.`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteStory(story.id, currentUser);
+      navigate("/");
+    } catch (err) {
+      console.error("Failed to delete story:", err);
+      alert("Could not delete the case. " + (err.message || ""));
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (mockStory) {
@@ -244,6 +264,28 @@ export default function StoryDetail() {
         </div>
 
         <div className="story-info-col">
+          <div
+            className={
+              "story-credit-row" +
+              (story.createdBy ? " story-credit-user" : " story-credit-featured")
+            }
+          >
+            <span className="story-credit-text">
+              {story.createdBy
+                ? `Case Created By: ${story.createdByName || "Anonymous"}`
+                : "Featured Story"}
+            </span>
+            {isOwner && (
+              <button
+                type="button"
+                className="story-delete-btn"
+                onClick={handleDeleteStory}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Delete Case"}
+              </button>
+            )}
+          </div>
           <h1 className="story-name">{story.name}</h1>
           <span className="story-status-badge">Missing</span>
 
