@@ -6,8 +6,10 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
   onSnapshot,
 } from "firebase/firestore";
+
 import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -30,6 +32,10 @@ export default function Profile() {
   const [usernameError, setUsernameError] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
   const [commentHistory, setCommentHistory] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+  const [casesCreated, setCasesCreated] = useState([]);
+  const [socialTab, setSocialTab] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -49,6 +55,37 @@ export default function Profile() {
       (err) => console.error("Failed to load comment history:", err)
     );
     return unsubscribe;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      collection(db, "users", currentUser.uid, "followers"),
+      (snap) => setFollowers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = onSnapshot(
+      collection(db, "users", currentUser.uid, "following"),
+      (snap) => setFollowing(snap.docs.map((d) => ({ uid: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, "stories"),
+      where("createdBy", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setCasesCreated(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error("Failed to load cases:", err));
+    return unsub;
   }, [currentUser]);
 
   async function handleDeleteHistoryComment(item) {
@@ -311,14 +348,111 @@ export default function Profile() {
           </div>
 
           <div className="profile-col profile-col-right">
-            <div className="profile-stat-box">
-              <span className="profile-stat-label">Followers:</span>
-              <span className="profile-stat-count">0</span>
-            </div>
-            <div className="profile-stat-box">
-              <span className="profile-stat-label">Following:</span>
-              <span className="profile-stat-count">0</span>
-            </div>
+            <button
+              className="profile-stat-box"
+              onClick={() => setSocialTab(socialTab === "followers" ? null : "followers")}
+            >
+              <span className="profile-stat-label">Followers</span>
+              <span className="profile-stat-count">{followers.length}</span>
+            </button>
+            <button
+              className="profile-stat-box"
+              onClick={() => setSocialTab(socialTab === "following" ? null : "following")}
+            >
+              <span className="profile-stat-label">Following</span>
+              <span className="profile-stat-count">{following.length}</span>
+            </button>
+
+            {socialTab === "followers" && (
+              <div className="profile-social-list">
+                <p className="profile-social-list-title">Followers</p>
+                {followers.length === 0 ? (
+                  <p className="profile-social-empty">No followers yet.</p>
+                ) : (
+                  followers.map((f) => (
+                    <div
+                      key={f.uid}
+                      className="profile-social-row"
+                      onClick={() => navigate(`/user/${f.uid}`)}
+                    >
+                      <div className="profile-social-avatar">
+                        {f.profilePicture ? (
+                          <img src={f.profilePicture} alt="" />
+                        ) : (
+                          (f.username || "?").charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <span className="profile-social-name">
+                        {f.username || "Anonymous"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {socialTab === "following" && (
+              <div className="profile-social-list">
+                <p className="profile-social-list-title">Following</p>
+                {following.length === 0 ? (
+                  <p className="profile-social-empty">Not following anyone yet.</p>
+                ) : (
+                  following.map((f) => (
+                    <div
+                      key={f.uid}
+                      className="profile-social-row"
+                      onClick={() => navigate(`/user/${f.uid}`)}
+                    >
+                      <div className="profile-social-avatar">
+                        {f.profilePicture ? (
+                          <img src={f.profilePicture} alt="" />
+                        ) : (
+                          (f.username || "?").charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <span className="profile-social-name">
+                        {f.username || "Anonymous"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            <button
+              className="profile-stat-box"
+              onClick={() => setSocialTab(socialTab === "cases" ? null : "cases")}
+            >
+              <span className="profile-stat-label">Cases Created</span>
+              <span className="profile-stat-count">{casesCreated.length}</span>
+            </button>
+
+            {socialTab === "cases" && (
+              <div className="profile-social-list">
+                <p className="profile-social-list-title">Cases Created</p>
+                {casesCreated.length === 0 ? (
+                  <p className="profile-social-empty">No cases created yet.</p>
+                ) : (
+                  casesCreated.map((c) => (
+                    <div
+                      key={c.id}
+                      className="profile-social-row"
+                      onClick={() => navigate(`/story/${c.id}`)}
+                    >
+                      <div className="profile-case-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                          <circle cx="9" cy="7" r="4"/>
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                      </div>
+                      <span className="profile-social-name">{c.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>

@@ -4,9 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { subscribeToStories } from "../data/stories";
 import CreateCaseModal from "../components/CreateCaseModal";
+import personPlaceholder from "../assets/person-placeholder.svg";
 
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
+const PLACEHOLDER_IMAGE = personPlaceholder;
 
 const MOCK_STORIES = [
   {

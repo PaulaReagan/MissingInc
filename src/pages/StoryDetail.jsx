@@ -20,8 +20,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { MOCK_STORIES } from "./Home";
 import { getStoryById, deleteStory } from "../data/stories";
 
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
+import personPlaceholder from "../assets/person-placeholder.svg";
+
+const PLACEHOLDER_IMAGE = personPlaceholder;
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -367,40 +368,62 @@ export default function StoryDetail() {
             </div>
           )}
 
-          {comments.map((comment) => (
-            <div className="thread-comment" key={comment.id}>
-              <div className="thread-comment-avatar">
-                {comment.authorPicture ? (
-                  <img src={comment.authorPicture} alt="" />
-                ) : (
-                  (comment.authorName || "U").charAt(0).toUpperCase()
-                )}
-              </div>
-              <div className="thread-comment-body">
-                <div className="thread-comment-header">
-                  <span className="thread-comment-author">
-                    {comment.authorName}
-                  </span>
-                  <span className="thread-comment-time">
-                    {timeAgo(comment.createdAt)}
-                  </span>
-                  {comment.authorId === currentUser?.uid && (
-                    <button
-                      className="thread-comment-delete"
-                      onClick={() => handleDeleteComment(comment)}
-                      title="Delete comment"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
+          {comments.map((comment) => {
+            function handleAuthorClick() {
+              if (!comment.authorId) return;
+              if (comment.authorId === currentUser?.uid) {
+                navigate("/profile");
+              } else {
+                navigate(`/user/${comment.authorId}`);
+              }
+            }
+
+            const isClickable = Boolean(comment.authorId);
+
+            return (
+              <div className="thread-comment" key={comment.id}>
+                <div
+                  className="thread-comment-avatar"
+                  onClick={handleAuthorClick}
+                  style={{ cursor: isClickable ? "pointer" : "default" }}
+                  title={isClickable ? `View ${comment.authorName}'s profile` : undefined}
+                >
+                  {comment.authorPicture ? (
+                    <img src={comment.authorPicture} alt="" />
+                  ) : (
+                    (comment.authorName || "U").charAt(0).toUpperCase()
                   )}
                 </div>
-                <p className="thread-comment-text">{comment.text}</p>
+                <div className="thread-comment-body">
+                  <div className="thread-comment-header">
+                    <span
+                      className="thread-comment-author"
+                      onClick={handleAuthorClick}
+                      style={{ cursor: isClickable ? "pointer" : "default" }}
+                    >
+                      {comment.authorName}
+                    </span>
+                    <span className="thread-comment-time">
+                      {timeAgo(comment.createdAt)}
+                    </span>
+                    {comment.authorId === currentUser?.uid && (
+                      <button
+                        className="thread-comment-delete"
+                        onClick={() => handleDeleteComment(comment)}
+                        title="Delete comment"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <p className="thread-comment-text">{comment.text}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
