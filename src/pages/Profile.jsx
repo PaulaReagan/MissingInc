@@ -157,7 +157,7 @@ export default function Profile() {
     <div className="home-container">
       <header className="home-header">
         <div className="home-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-          MyApp
+          Missing: Sonoma County
         </div>
         <div className="home-user-section">
           <div
