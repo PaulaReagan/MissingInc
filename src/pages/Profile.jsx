@@ -135,21 +135,21 @@ export default function Profile() {
       e.target.value = "";
       return;
     }
-
-    setUploading(true);
-    try {
-      await uploadProfilePicture(file);
-    } catch (err) {
-      console.error("Upload failed:", err);
-      if (err.code === "storage/unauthorized" || err.code === "storage/retry-limit-exceeded") {
-        setUploadError("Upload denied. Firebase Storage rules may need to be updated.");
-      } else if (err.code === "storage/unknown") {
-        setUploadError("Firebase Storage may not be enabled. Check the Firebase console.");
-      } else {
-        setUploadError("Upload failed: " + (err.message || "Unknown error"));
-      }
-    }
-    setUploading(false);
+	setUploading(true);
+	try {
+  	await uploadProfilePicture(file);
+	} 	catch (err) {
+  	console.error("Upload failed:", err);
+  	if (err.code === "storage/unauthorized" || err.code === "storage/retry-limit-exceeded") {
+    	setUploadError("Upload denied. Firebase Storage rules may need to be updated.");
+  	} else if (err.code === "storage/unknown") {
+    	setUploadError("Firebase Storage may not be enabled. Check the Firebase console.");
+  	} else {
+    	setUploadError("Upload failed: " + (err.message || "Unknown error"));
+  	}
+	} finally {
+  	setUploading(false);
+	}
     e.target.value = "";
   }
 
