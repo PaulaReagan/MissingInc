@@ -135,21 +135,21 @@ export default function Profile() {
       e.target.value = "";
       return;
     }
-
-    setUploading(true);
-    try {
-      await uploadProfilePicture(file);
-    } catch (err) {
-      console.error("Upload failed:", err);
-      if (err.code === "storage/unauthorized" || err.code === "storage/retry-limit-exceeded") {
-        setUploadError("Upload denied. Firebase Storage rules may need to be updated.");
-      } else if (err.code === "storage/unknown") {
-        setUploadError("Firebase Storage may not be enabled. Check the Firebase console.");
-      } else {
-        setUploadError("Upload failed: " + (err.message || "Unknown error"));
-      }
-    }
-    setUploading(false);
+	setUploading(true);
+	try {
+  	await uploadProfilePicture(file);
+	} 	catch (err) {
+  	console.error("Upload failed:", err);
+  	if (err.code === "storage/unauthorized" || err.code === "storage/retry-limit-exceeded") {
+    	setUploadError("Upload denied. Firebase Storage rules may need to be updated.");
+  	} else if (err.code === "storage/unknown") {
+    	setUploadError("Firebase Storage may not be enabled. Check the Firebase console.");
+  	} else {
+    	setUploadError("Upload failed: " + (err.message || "Unknown error"));
+  	}
+	} finally {
+  	setUploading(false);
+	}
     e.target.value = "";
   }
 
@@ -157,7 +157,7 @@ export default function Profile() {
     <div className="home-container">
       <header className="home-header">
         <div className="home-logo" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
-          MyApp
+          Missing: Sonoma County
         </div>
         <div className="home-user-section">
           <div
@@ -193,7 +193,6 @@ export default function Profile() {
           <h1>Hey Detective, {displayName}</h1>
         </div>
         <div className="profile-grid">
-          {/* Left column — profile picture */}
           <div className="profile-col profile-col-picture">
             <div
               className={`profile-picture-wrapper ${uploading ? "uploading" : ""}`}
@@ -269,7 +268,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Middle column — Comment History */}
           <div className="profile-col profile-col-middle">
             <h3 className="profile-col-heading">
               Comment History
@@ -312,7 +310,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Right column — Followers & Following */}
           <div className="profile-col profile-col-right">
             <div className="profile-stat-box">
               <span className="profile-stat-label">Followers:</span>

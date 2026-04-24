@@ -23,7 +23,6 @@ import { getStoryById, deleteStory } from "../data/stories";
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=500&fit=crop";
 
-// Fix default marker icons when bundled with Vite
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,

@@ -11,7 +11,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useAuth } from "../contexts/AuthContext";
-import { createStory, uploadStoryPhoto } from "../data/stories";
+import { createStory, uploadToCloudinary } from "../data/stories";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -113,10 +113,9 @@ export default function CreateCaseModal({ onClose }) {
       let imageUrl = "";
       if (photoFile) {
         setUploadProgress("Preparing photo…");
-        imageUrl = await uploadStoryPhoto(photoFile, currentUser, (pct) => {
-          setUploadProgress("Uploading photo…");
-          setUploadPct(pct);
-        });
+        setUploadProgress("Uploading photo…");
+		imageUrl = await uploadToCloudinary(photoFile);
+		setUploadPct(100);
       }
 
       setUploadProgress("Saving case…");

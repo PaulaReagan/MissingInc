@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { uploadToCloudinary } from "../data/stories";
 import { auth, googleProvider, db, storage } from "../firebase/config";
 
 const AuthContext = createContext();
@@ -64,17 +64,18 @@ export function AuthProvider({ children }) {
     setUserProfile((prev) => ({ ...prev, username: trimmed }));
   }
 
-  async function uploadProfilePicture(file) {
-    if (!currentUser) throw new Error("Not authenticated");
-    const storageRef = ref(storage, `profilePictures/${currentUser.uid}`);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
-    await updateDoc(doc(db, "users", currentUser.uid), {
-      profilePicture: downloadURL,
-    });
-    setUserProfile((prev) => ({ ...prev, profilePicture: downloadURL }));
-    return downloadURL;
-  }
+async function uploadProfilePicture(file) {
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const downloadURL = await uploadToCloudinary(file);
+
+  await updateDoc(doc(db, "users", currentUser.uid), {
+    profilePicture: downloadURL,
+  });
+
+  setUserProfile((prev) => ({ ...prev, profilePicture: downloadURL }));
+  return downloadURL;
+}
 
   async function fetchUserProfile(user) {
     if (user) {

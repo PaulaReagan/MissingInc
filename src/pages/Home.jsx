@@ -121,7 +121,7 @@ export default function Home() {
             {displayName}
           </span>
 
-          <Link to="/map">
+          <Link to="/map" style={{ textDecoration: "none" }}>
             <button className="btn">Map</button>
           </Link>
 
@@ -228,4 +228,4 @@ export default function Home() {
   );
 }
 
-export { MOCK_STORIES };
+export { MOCK_STORIES }; // add fake data for demo
