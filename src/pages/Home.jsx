@@ -121,7 +121,7 @@ export default function Home() {
             {displayName}
           </span>
 
-          <Link to="/map">
+          <Link to="/map" style={{ textDecoration: "none" }}>
             <button className="btn">Map</button>
           </Link>
 
