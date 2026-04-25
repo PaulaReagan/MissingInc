@@ -3,10 +3,10 @@ import {
   addDoc,
   doc,
   getDoc,
+  setDoc,
+  updateDoc,
   deleteDoc,
   onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -113,14 +113,28 @@ export async function uploadStoryPhoto(file, user, onProgress) {
 const STORIES_COLLECTION = "stories";
 
 export function subscribeToStories(onData, onError) {
-  const q = query(
-    collection(db, STORIES_COLLECTION),
-    orderBy("createdAt", "desc")
-  );
+  // No orderBy on the server — avoids Firestore silently dropping documents
+  // whose createdAt is null/pending. We sort client-side instead.
   return onSnapshot(
-    q,
+    collection(db, STORIES_COLLECTION),
     (snapshot) => {
-      const stories = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const stories = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const aMs =
+            typeof a.createdAt?.toMillis === "function"
+              ? a.createdAt.toMillis()
+              : a.createdAt
+              ? new Date(a.createdAt).getTime()
+              : 0;
+          const bMs =
+            typeof b.createdAt?.toMillis === "function"
+              ? b.createdAt.toMillis()
+              : b.createdAt
+              ? new Date(b.createdAt).getTime()
+              : 0;
+          return bMs - aMs;
+        });
       onData(stories);
     },
     (err) => {
@@ -163,6 +177,44 @@ export async function getStoryById(id) {
   const snapshot = await getDoc(doc(db, STORIES_COLLECTION, id));
   if (!snapshot.exists()) return null;
   return { id: snapshot.id, ...snapshot.data() };
+}
+
+export async function updateStory(storyId, data, user) {
+  if (!user) throw new Error("You must be logged in to edit a case.");
+  if (!data.name || !data.name.trim()) throw new Error("Name is required.");
+
+  const fields = {
+    name: data.name.trim(),
+    age: data.age?.toString().trim() || "-",
+    image: data.image?.trim() || "",
+    lastSeen: data.lastSeen?.trim() || "-",
+    lastSeenDate: data.lastSeenDate?.trim() || "-",
+    height: data.height?.trim() || "-",
+    weight: data.weight?.trim() || "-",
+    hair: data.hair?.trim() || "-",
+    eyes: data.eyes?.trim() || "-",
+    summary: data.summary?.trim() || "-",
+    lat: typeof data.lat === "number" ? data.lat : null,
+    lng: typeof data.lng === "number" ? data.lng : null,
+    updatedAt: serverTimestamp(),
+  };
+
+  const docRef = doc(db, STORIES_COLLECTION, storyId);
+  const existing = await getDoc(docRef);
+
+  if (existing.exists()) {
+    // Real Firestore story — update content fields, preserve original creator info
+    await updateDoc(docRef, fields);
+  } else {
+    // Featured/mock story being edited for the first time — promote it to a
+    // real Firestore document so it appears in the feed
+    await setDoc(docRef, {
+      ...fields,
+      createdAt: serverTimestamp(),
+      createdBy: user.uid,
+      createdByName: data.createdByName || user.displayName || user.email || "Admin",
+    });
+  }
 }
 
 export async function deleteStory(storyId, user) {

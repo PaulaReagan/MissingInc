@@ -19,6 +19,7 @@ import { db } from "../firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 import { MOCK_STORIES } from "./Home";
 import { getStoryById, deleteStory } from "../data/stories";
+import EditCaseModal from "../components/EditCaseModal";
 
 import personPlaceholder from "../assets/person-placeholder.svg";
 
@@ -37,16 +38,23 @@ export default function StoryDetail() {
   const { currentUser, userProfile } = useAuth();
 
   const mockStory = MOCK_STORIES.find((s) => s.id === id);
-  const [story, setStory] = useState(mockStory || null);
-  const [loadingStory, setLoadingStory] = useState(!mockStory);
+  const [story, setStory] = useState(null);
+  const [loadingStory, setLoadingStory] = useState(true);
 
+  const [showEditModal, setShowEditModal] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const isAdmin = currentUser?.email === "reagan.paula10@gmail.com";
   const isOwner =
-    story && story.createdBy && currentUser && story.createdBy === currentUser.uid;
+    isAdmin ||
+    (story && story.createdBy && currentUser && story.createdBy === currentUser.uid);
+
+  function handleStorySaved(updatedFields) {
+    setStory((prev) => ({ ...prev, ...updatedFields }));
+  }
 
   async function handleDeleteStory() {
     if (!story || !isOwner) return;
@@ -65,31 +73,28 @@ export default function StoryDetail() {
   }
 
   useEffect(() => {
-    if (mockStory) {
-      setStory(mockStory);
-      setLoadingStory(false);
-      return;
-    }
     let active = true;
     setLoadingStory(true);
+    // Always check Firestore first — edited featured stories are saved there.
+    // Fall back to the hardcoded mock only if Firestore has no document.
     getStoryById(id)
       .then((fetched) => {
         if (active) {
-          setStory(fetched);
+          setStory(fetched || mockStory || null);
           setLoadingStory(false);
         }
       })
       .catch((err) => {
         console.error("Failed to load story:", err);
         if (active) {
-          setStory(null);
+          setStory(mockStory || null);
           setLoadingStory(false);
         }
       });
     return () => {
       active = false;
     };
-  }, [id, mockStory]);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -276,14 +281,24 @@ export default function StoryDetail() {
                 : "Featured Story"}
             </span>
             {isOwner && (
-              <button
-                type="button"
-                className="story-delete-btn"
-                onClick={handleDeleteStory}
-                disabled={deleting}
-              >
-                {deleting ? "Deleting…" : "Delete Case"}
-              </button>
+              <div className="story-owner-actions">
+                <button
+                  type="button"
+                  className="story-edit-btn"
+                  onClick={() => setShowEditModal(true)}
+                  disabled={deleting}
+                >
+                  Edit Case
+                </button>
+                <button
+                  type="button"
+                  className="story-delete-btn"
+                  onClick={handleDeleteStory}
+                  disabled={deleting}
+                >
+                  {deleting ? "Deleting…" : "Delete Case"}
+                </button>
+              </div>
             )}
           </div>
           <h1 className="story-name">{story.name}</h1>
@@ -426,6 +441,14 @@ export default function StoryDetail() {
           })}
         </div>
       </div>
+
+      {showEditModal && story && (
+        <EditCaseModal
+          story={story}
+          onClose={() => setShowEditModal(false)}
+          onSaved={handleStorySaved}
+        />
+      )}
     </div>
   );
 }

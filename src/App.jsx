@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import StoryDetail from "./pages/StoryDetail";
 import PublicProfile from "./pages/PublicProfile";
+import MessagesPage from "./pages/MessagesPage";
 
 function App() {
   return (
@@ -43,6 +44,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <PublicProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <MessagesPage />
               </ProtectedRoute>
             }
           />

@@ -69,7 +69,13 @@ export default function Home() {
     return unsubscribe;
   }, []);
 
-  const allStories = [...firestoreStories, ...MOCK_STORIES];
+  // Firestore versions take priority — if admin edited a featured story it's
+  // saved to Firestore under the same ID, so we filter out the hardcoded duplicate.
+  const firestoreIds = new Set(firestoreStories.map((s) => s.id));
+  const allStories = [
+    ...firestoreStories,
+    ...MOCK_STORIES.filter((m) => !firestoreIds.has(m.id)),
+  ];
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -102,6 +108,16 @@ export default function Home() {
       <header className="home-header">
         <div className="home-logo">Missing: Sonoma County</div>
         <div className="home-user-section">
+          <button
+            className="nav-msg-btn"
+            onClick={() => navigate("/messages")}
+            title="Direct Messages"
+            aria-label="Direct Messages"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
           <div
             className="home-avatar"
             onClick={() => navigate("/profile")}
