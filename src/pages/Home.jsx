@@ -104,6 +104,8 @@ const displayName =
   currentUser?.displayName ||
   currentUser?.email;
 
+const profilePicture = userProfile?.profilePicture;
+
   return (
     <div className="home-container">
       <header className="home-header">
