@@ -13,6 +13,7 @@ import {
   updateDoc,
   runTransaction,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 import { auth, googleProvider, db } from "../firebase/config";
 import { uploadToCloudinary } from "../data/stories";
@@ -249,6 +250,47 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+async function followUser(targetUid, targetProfile) {
+  if (!currentUser) throw new Error("Not authenticated");
+  if (!targetUid) throw new Error("No user selected");
+  if (targetUid === currentUser.uid) throw new Error("You cannot follow yourself");
+
+  const myFollowingRef = doc(db, "users", currentUser.uid, "following", targetUid);
+  const theirFollowerRef = doc(db, "users", targetUid, "followers", currentUser.uid);
+
+  await setDoc(myFollowingRef, {
+    uid: targetUid,
+    username: targetProfile?.username || "Anonymous",
+    displayName: targetProfile?.displayName || targetProfile?.username || "Anonymous",
+    profilePicture: targetProfile?.profilePicture || "",
+    createdAt: serverTimestamp(),
+  });
+
+  await setDoc(theirFollowerRef, {
+    uid: currentUser.uid,
+    username: userProfile?.username || currentUser.email?.split("@")[0] || "Anonymous",
+    displayName:
+      userProfile?.displayName ||
+      userProfile?.username ||
+      currentUser.displayName ||
+      currentUser.email ||
+      "Anonymous",
+    profilePicture: userProfile?.profilePicture || "",
+    createdAt: serverTimestamp(),
+  });
+}
+
+async function unfollowUser(targetUid) {
+  if (!currentUser) throw new Error("Not authenticated");
+  if (!targetUid) throw new Error("No user selected");
+
+  const myFollowingRef = doc(db, "users", currentUser.uid, "following", targetUid);
+  const theirFollowerRef = doc(db, "users", targetUid, "followers", currentUser.uid);
+
+  await deleteDoc(myFollowingRef);
+  await deleteDoc(theirFollowerRef);
+}
+
   const value = {
     currentUser,
     userProfile,
@@ -259,6 +301,8 @@ export function AuthProvider({ children }) {
     updateUsername,
     updateDisplayName,
     uploadProfilePicture,
+    followUser,
+    unfollowUser,
   };
 
   return (
