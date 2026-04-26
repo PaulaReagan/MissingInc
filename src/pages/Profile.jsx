@@ -23,7 +23,18 @@ function getInitials(name) {
 }
 
 export default function Profile() {
-  const { currentUser, userProfile, logout, uploadProfilePicture, updateUsername } = useAuth();
+  const {
+  currentUser,
+  userProfile,
+  logout,
+  uploadProfilePicture,
+  updateUsername,
+  updateDisplayName,
+} = useAuth();
+    const [editingDisplayName, setEditingDisplayName] = useState(false);
+const [newDisplayName, setNewDisplayName] = useState("");
+const [displayNameError, setDisplayNameError] = useState("");
+const [savingDisplayName, setSavingDisplayName] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -114,11 +125,19 @@ export default function Profile() {
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
   }
+const displayName =
+  userProfile?.displayName ||
+  userProfile?.username ||
+  currentUser?.displayName ||
+  currentUser?.email;
 
-  const displayName =
-    userProfile?.username || currentUser?.displayName || currentUser?.email;
-  const profilePicture = userProfile?.profilePicture;
-  const initials = getInitials(displayName);
+const username =
+  userProfile?.username ||
+  currentUser?.email?.split("@")[0] ||
+  "";
+
+const profilePicture = userProfile?.profilePicture;
+const initials = getInitials(displayName);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -135,11 +154,29 @@ export default function Profile() {
     setUsernameError("");
     setEditingUsername(true);
   }
+function handleEditDisplayName() {
+  setNewDisplayName(userProfile?.displayName || userProfile?.username || "");
+  setDisplayNameError("");
+  setEditingDisplayName(true);
+}
+
+async function handleSaveDisplayName() {
+  setDisplayNameError("");
+  setSavingDisplayName(true);
+  try {
+    await updateDisplayName(newDisplayName);
+    setEditingDisplayName(false);
+  } catch (err) {
+    setDisplayNameError(err.message || "Failed to update name.");
+  }
+  setSavingDisplayName(false);
+}
 
   async function handleSaveUsername() {
     setUsernameError("");
     if (newUsername.trim().length < 3) {
-      setUsernameError("Username must be at least 3 characters.");
+      setUsernameError("Username must be 3-20 characters and can only use lowercase letters, numbers, and underscores."
+);
       return;
     }
     setSavingUsername(true);
@@ -267,10 +304,49 @@ export default function Profile() {
               />
             </div>
             {uploadError && <div className="profile-upload-error">{uploadError}</div>}
-            <h2 className="profile-display-name">{displayName}</h2>
-            <p className="profile-email">{currentUser?.email}</p>
+<h2 className="profile-display-name">{displayName}</h2>
+<p className="profile-email">@{username}</p>
+<p className="profile-email">{currentUser?.email}</p>
 
             <div className="profile-actions">
+			{editingDisplayName ? (
+  <div className="profile-inline-edit">
+    <input
+      type="text"
+      value={newDisplayName}
+      onChange={(e) => setNewDisplayName(e.target.value)}
+      placeholder="New name"
+      className="profile-inline-input"
+      autoFocus
+      onKeyDown={(e) => {
+        if (e.key === "Enter") handleSaveDisplayName();
+        if (e.key === "Escape") setEditingDisplayName(false);
+      }}
+      disabled={savingDisplayName}
+    />
+    {displayNameError && <p className="profile-inline-error">{displayNameError}</p>}
+    <div className="profile-inline-buttons">
+      <button
+        className="btn profile-action-btn profile-action-btn-save"
+        onClick={handleSaveDisplayName}
+        disabled={savingDisplayName}
+      >
+        {savingDisplayName ? "Saving..." : "Save Name"}
+      </button>
+      <button
+        className="btn profile-action-btn"
+        onClick={() => setEditingDisplayName(false)}
+        disabled={savingDisplayName}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+) : (
+  <button className="btn profile-action-btn" onClick={handleEditDisplayName}>
+    Change Name
+  </button>
+)}
               {editingUsername ? (
                 <div className="profile-inline-edit">
                   <input

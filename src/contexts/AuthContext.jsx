@@ -11,17 +11,58 @@ import {
   setDoc,
   getDoc,
   updateDoc,
-  deleteDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  writeBatch,
+  runTransaction,
+  serverTimestamp,
 } from "firebase/firestore";
+import { auth, googleProvider, db } from "../firebase/config";
 import { uploadToCloudinary } from "../data/stories";
-import { auth, googleProvider, db, storage } from "../firebase/config";
 
 const AuthContext = createContext();
+
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
+
+function normalizeUsername(value) {
+  return value.trim().toLowerCase();
+}
+
+function validateUsername(value) {
+  const normalized = normalizeUsername(value);
+  if (!USERNAME_REGEX.test(normalized)) {
+    throw new Error(
+      "Username must be 3-20 characters and can only contain lowercase letters, numbers, and underscores."
+    );
+  }
+  return normalized;
+}
+
+function validateDisplayName(value) {
+  const trimmed = value.trim();
+  if (trimmed.length < 2 || trimmed.length > 40) {
+    throw new Error("Name must be between 2 and 40 characters.");
+  }
+  return trimmed;
+}
+
+async function findAvailableUsername(seed) {
+  let base = normalizeUsername(seed || "user")
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 20);
+
+  if (base.length < 3) base = "user";
+
+  let candidate = base;
+  let counter = 1;
+
+  while (true) {
+    const snap = await getDoc(doc(db, "usernames", candidate));
+    if (!snap.exists()) return candidate;
+
+    const suffix = `_${counter}`;
+    const trimmedBase = base.slice(0, 20 - suffix.length);
+    candidate = `${trimmedBase}${suffix}`;
+    counter += 1;
+  }
+}
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -32,13 +73,35 @@ export function AuthProvider({ children }) {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  async function signup(email, password, username) {
+  async function signup(email, password, username, displayName = "") {
+    const cleanUsername = validateUsername(username);
+    const cleanDisplayName = validateDisplayName(displayName || username);
+
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "users", userCredential.user.uid), {
-      username,
-      email,
-      createdAt: new Date().toISOString(),
+    const uid = userCredential.user.uid;
+
+    await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, "users", uid);
+      const usernameRef = doc(db, "usernames", cleanUsername);
+
+      const usernameSnap = await transaction.get(usernameRef);
+      if (usernameSnap.exists()) {
+        throw new Error("Username is already taken.");
+      }
+
+      transaction.set(userRef, {
+        username: cleanUsername,
+        displayName: cleanDisplayName,
+        email,
+        createdAt: serverTimestamp(),
+      });
+
+      transaction.set(usernameRef, {
+        uid,
+        createdAt: serverTimestamp(),
+      });
     });
+
     return userCredential;
   }
 
@@ -48,14 +111,43 @@ export function AuthProvider({ children }) {
 
   async function loginWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
-    const userDoc = await getDoc(doc(db, "users", result.user.uid));
+    const uid = result.user.uid;
+    const userRef = doc(db, "users", uid);
+    const userDoc = await getDoc(userRef);
+
     if (!userDoc.exists()) {
-      await setDoc(doc(db, "users", result.user.uid), {
-        username: result.user.displayName || result.user.email.split("@")[0],
-        email: result.user.email,
-        createdAt: new Date().toISOString(),
+      const seed =
+        result.user.email?.split("@")[0] ||
+        result.user.displayName ||
+        "user";
+
+      const availableUsername = await findAvailableUsername(seed);
+      const cleanDisplayName = validateDisplayName(
+        result.user.displayName || availableUsername
+      );
+
+      await runTransaction(db, async (transaction) => {
+        const usernameRef = doc(db, "usernames", availableUsername);
+        const usernameSnap = await transaction.get(usernameRef);
+
+        if (usernameSnap.exists()) {
+          throw new Error("Generated username is already taken. Please try again.");
+        }
+
+        transaction.set(userRef, {
+          username: availableUsername,
+          displayName: cleanDisplayName,
+          email: result.user.email,
+          createdAt: serverTimestamp(),
+        });
+
+        transaction.set(usernameRef, {
+          uid,
+          createdAt: serverTimestamp(),
+        });
       });
     }
+
     return result;
   }
 
@@ -63,67 +155,69 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-async function updateUsername(newUsername) {
-  if (!currentUser) throw new Error("Not authenticated");
+  async function updateUsername(newUsername) {
+    if (!currentUser) throw new Error("Not authenticated");
 
-  console.log("AUTH USER:", {
-    uid: currentUser.uid,
-    email: currentUser.email,
-  });
+    const cleanUsername = validateUsername(newUsername);
+    const userRef = doc(db, "users", currentUser.uid);
 
-  const trimmed = newUsername.trim();
+    await runTransaction(db, async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists()) throw new Error("User profile not found.");
 
-  console.log("ABOUT TO UPDATE DOC:", `users/${currentUser.uid}`);
+      const currentData = userSnap.data();
+      const oldUsername = currentData.username;
 
-  try {
-    await updateDoc(doc(db, "users", currentUser.uid), {
-      username: trimmed,
+      if (oldUsername === cleanUsername) return;
+
+      const newUsernameRef = doc(db, "usernames", cleanUsername);
+      const newUsernameSnap = await transaction.get(newUsernameRef);
+
+      if (newUsernameSnap.exists() && newUsernameSnap.data().uid !== currentUser.uid) {
+        throw new Error("Username is already taken.");
+      }
+
+      transaction.set(newUsernameRef, {
+        uid: currentUser.uid,
+        createdAt: serverTimestamp(),
+      });
+
+      transaction.update(userRef, {
+        username: cleanUsername,
+      });
+
+      if (oldUsername) {
+        const oldUsernameRef = doc(db, "usernames", oldUsername);
+        transaction.delete(oldUsernameRef);
+      }
     });
-    console.log("UPDATE SUCCESS");
-  } catch (err) {
-    console.error("UPDATE USERNAME ERROR:", err);
-    console.error("ERROR CODE:", err.code);
-    console.error("ERROR MESSAGE:", err.message);
-    throw err;
+
+    setUserProfile((prev) => ({ ...prev, username: cleanUsername }));
   }
 
-  setUserProfile((prev) => ({ ...prev, username: trimmed }));
-}
-
-async function uploadProfilePicture(file) {
-  if (!currentUser) throw new Error("Not authenticated");
-
-  const downloadURL = await uploadToCloudinary(file);
-
-  await updateDoc(doc(db, "users", currentUser.uid), {
-    profilePicture: downloadURL,
-  });
-
-  setUserProfile((prev) => ({ ...prev, profilePicture: downloadURL }));
-  return downloadURL;
-}
-
-  async function followUser(targetUid, targetProfile) {
+  async function updateDisplayName(newDisplayName) {
     if (!currentUser) throw new Error("Not authenticated");
-    const now = new Date().toISOString();
-    const myInfo = {
-      username: userProfile?.username || currentUser.displayName || currentUser.email,
-      profilePicture: userProfile?.profilePicture || null,
-      followedAt: now,
-    };
-    const targetInfo = {
-      username: targetProfile?.username || "Anonymous",
-      profilePicture: targetProfile?.profilePicture || null,
-      followedAt: now,
-    };
-    await setDoc(doc(db, "users", currentUser.uid, "following", targetUid), targetInfo);
-    await setDoc(doc(db, "users", targetUid, "followers", currentUser.uid), myInfo);
+
+    const cleanDisplayName = validateDisplayName(newDisplayName);
+
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      displayName: cleanDisplayName,
+    });
+
+    setUserProfile((prev) => ({ ...prev, displayName: cleanDisplayName }));
   }
 
-  async function unfollowUser(targetUid) {
+  async function uploadProfilePicture(file) {
     if (!currentUser) throw new Error("Not authenticated");
-    await deleteDoc(doc(db, "users", currentUser.uid, "following", targetUid));
-    await deleteDoc(doc(db, "users", targetUid, "followers", currentUser.uid));
+
+    const downloadURL = await uploadToCloudinary(file);
+
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      profilePicture: downloadURL,
+    });
+
+    setUserProfile((prev) => ({ ...prev, profilePicture: downloadURL }));
+    return downloadURL;
   }
 
   async function fetchUserProfile(user) {
@@ -132,7 +226,10 @@ async function uploadProfilePicture(file) {
       if (userDoc.exists()) {
         setUserProfile(userDoc.data());
       } else {
-        setUserProfile({ username: user.displayName || user.email });
+        setUserProfile({
+          username: user.displayName || user.email,
+          displayName: user.displayName || user.email,
+        });
       }
     } else {
       setUserProfile(null);
@@ -160,9 +257,8 @@ async function uploadProfilePicture(file) {
     loginWithGoogle,
     logout,
     updateUsername,
+    updateDisplayName,
     uploadProfilePicture,
-    followUser,
-    unfollowUser,
   };
 
   return (

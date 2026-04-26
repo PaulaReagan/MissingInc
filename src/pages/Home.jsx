@@ -98,10 +98,11 @@ export default function Home() {
       behavior: "smooth",
     });
   }
-
-  const displayName =
-    userProfile?.username || currentUser?.displayName || currentUser?.email;
-  const profilePicture = userProfile?.profilePicture;
+const displayName =
+  userProfile?.displayName ||
+  userProfile?.username ||
+  currentUser?.displayName ||
+  currentUser?.email;
 
   return (
     <div className="home-container">
