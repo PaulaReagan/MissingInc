@@ -63,68 +63,32 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  async function updateUsername(newUsername) {
-    if (!currentUser) throw new Error("Not authenticated");
-    if (!newUsername || newUsername.trim().length < 3) {
-      throw new Error("Username must be at least 3 characters.");
-    }
-    const trimmed = newUsername.trim();
+async function updateUsername(newUsername) {
+  if (!currentUser) throw new Error("Not authenticated");
 
-    // Collect every write we need to do so we can batch them
-    const writes = [];
+  console.log("AUTH USER:", {
+    uid: currentUser.uid,
+    email: currentUser.email,
+  });
 
-    // 1. Update the user's own profile doc
-    writes.push([doc(db, "users", currentUser.uid), { username: trimmed }]);
+  const trimmed = newUsername.trim();
 
-    // 2. Update authorName on every comment history entry + its story thread copy
-    const historySnap = await getDocs(
-      collection(db, "users", currentUser.uid, "commentHistory")
-    );
-    historySnap.forEach((d) => {
-      const data = d.data();
-      // History entry
-      writes.push([
-        doc(db, "users", currentUser.uid, "commentHistory", d.id),
-        { authorName: trimmed },
-      ]);
-      // Live story thread comment
-      if (data.storyId && data.storyCommentId) {
-        writes.push([
-          doc(db, "stories", data.storyId, "comments", data.storyCommentId),
-          { authorName: trimmed },
-        ]);
-      }
+  console.log("ABOUT TO UPDATE DOC:", `users/${currentUser.uid}`);
+
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid), {
+      username: trimmed,
     });
-
-    // 3. Update createdByName on every story this user created
-    const storiesSnap = await getDocs(
-      query(collection(db, "stories"), where("createdBy", "==", currentUser.uid))
-    );
-    storiesSnap.forEach((d) => {
-      writes.push([doc(db, "stories", d.id), { createdByName: trimmed }]);
-    });
-
-    // 4. Update the username stored in each follower's "following" list
-    //    so their Following tab shows the new name
-    const followersSnap = await getDocs(
-      collection(db, "users", currentUser.uid, "followers")
-    );
-    followersSnap.forEach((d) => {
-      writes.push([
-        doc(db, "users", d.id, "following", currentUser.uid),
-        { username: trimmed },
-      ]);
-    });
-
-    // Commit in batches of 500 (Firestore hard limit)
-    for (let i = 0; i < writes.length; i += 500) {
-      const batch = writeBatch(db);
-      writes.slice(i, i + 500).forEach(([ref, data]) => batch.update(ref, data));
-      await batch.commit();
-    }
-
-    setUserProfile((prev) => ({ ...prev, username: trimmed }));
+    console.log("UPDATE SUCCESS");
+  } catch (err) {
+    console.error("UPDATE USERNAME ERROR:", err);
+    console.error("ERROR CODE:", err.code);
+    console.error("ERROR MESSAGE:", err.message);
+    throw err;
   }
+
+  setUserProfile((prev) => ({ ...prev, username: trimmed }));
+}
 
 async function uploadProfilePicture(file) {
   if (!currentUser) throw new Error("Not authenticated");
